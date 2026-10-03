@@ -28,4 +28,13 @@ if(BUILD_TESTING)
     )
     target_compile_options(netscope_event_id_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
     add_test(NAME netscope_event_id_tests COMMAND netscope_event_id_tests)
+
+    add_test(
+        NAME netscope_rejects_invalid_interval
+        COMMAND netscope --once --interval 1abc
+    )
+    set_tests_properties(
+        netscope_rejects_invalid_interval
+        PROPERTIES WILL_FAIL TRUE
+    )
 endif()
