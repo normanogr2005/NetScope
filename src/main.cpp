@@ -1,13 +1,14 @@
+#include "event_id.hpp"
 #include "netstats.hpp"
 #include "tcp.hpp"
 
+#include <cerrno>
+#include <cmath>
 #include <chrono>
 #include <cstdlib>
 #include <ctime>
-#include <functional>
 #include <iomanip>
 #include <iostream>
-#include <map>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -34,6 +35,26 @@ void print_help() {
         << "  -h, --help             Show this help\n";
 }
 
+bool parse_interval(const std::string& text, double& value) {
+    errno = 0;
+    char* end = nullptr;
+    const double parsed = std::strtod(text.c_str(), &end);
+
+    if (
+        errno == ERANGE
+        || end == text.c_str()
+        || end == nullptr
+        || *end != '\0'
+        || !std::isfinite(parsed)
+        || parsed <= 0.0
+    ) {
+        return false;
+    }
+
+    value = parsed;
+    return true;
+}
+
 bool parse_options(int argc, char** argv, Options& options) {
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -48,9 +69,10 @@ bool parse_options(int argc, char** argv, Options& options) {
                 std::cerr << "--interval requires a value\n";
                 return false;
             }
-            options.interval = std::strtod(argv[++i], nullptr);
-            if (options.interval <= 0.0) {
-                std::cerr << "interval must be > 0\n";
+
+            const std::string value = argv[++i];
+            if (!parse_interval(value, options.interval)) {
+                std::cerr << "interval must be a finite number > 0\n";
                 return false;
             }
         } else if (arg == "-h" || arg == "--help") {
@@ -83,7 +105,7 @@ std::string json_escape(const std::string& value) {
     out.reserve(value.size() + 8);
     for (const char ch : value) {
         switch (ch) {
-        case '"': out += "\\\""; break;
+        case '"': out += "\\""; break;
         case '\\': out += "\\\\"; break;
         case '\n': out += "\\n"; break;
         case '\r': out += "\\r"; break;
@@ -96,18 +118,28 @@ std::string json_escape(const std::string& value) {
 
 std::string timestamp_now() {
     const auto now = std::chrono::system_clock::now();
-    const std::time_t time = std::chrono::system_clock::to_time_t(now);
+    const auto seconds =
+        std::chrono::time_point_cast<std::chrono::seconds>(now);
+    const auto micros =
+        std::chrono::duration_cast<std::chrono::microseconds>(
+            now - seconds)
+            .count();
+
+    const std::time_t time =
+        std::chrono::system_clock::to_time_t(seconds);
     std::tm utc{};
     gmtime_r(&time, &utc);
+
     std::ostringstream out;
-    out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
+    out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%S")
+        << '.' << std::setfill('0') << std::setw(6) << micros
+        << 'Z';
     return out.str();
 }
 
 void print_json_rate(const netscope::RateStats& rate) {
     std::cout << "{"
-              << "\"event_id\":\"netscope-rate-" << std::hash<std::string>{}(rate.name)
-              << "-" << std::time(nullptr) << "\","
+              << "\"event_id\":\"" << netscope::make_event_id("rate") << "\","
               << "\"timestamp\":\"" << timestamp_now() << "\","
               << "\"source\":\"netscope\","
               << "\"event_type\":\"network_interface_rate\","
@@ -120,8 +152,7 @@ void print_json_rate(const netscope::RateStats& rate) {
 
 void print_json_connection(const netscope::TcpConnection& c) {
     std::cout << "{"
-              << "\"event_id\":\"netscope-tcp-" << std::hash<std::string>{}(c.local_address + c.remote_address)
-              << "-" << c.local_port << "-" << c.remote_port << "-" << std::time(nullptr) << "\","
+              << "\"event_id\":\"" << netscope::make_event_id("tcp") << "\","
               << "\"timestamp\":\"" << timestamp_now() << "\","
               << "\"source\":\"netscope\","
               << "\"event_type\":\"tcp_connection\","
