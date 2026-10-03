@@ -37,6 +37,7 @@ int main() {
         std::ofstream out(tcp_path);
         out << "  sl  local_address rem_address   st\n";
         out << "   0: 0100007F:0016 0200007F:C350 01\n";
+        out << "   1: 0100007F:0016X 0200007F:C350 01\n";
     }
 
     {
