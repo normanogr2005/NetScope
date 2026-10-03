@@ -22,4 +22,10 @@ if(BUILD_TESTING)
     )
     target_compile_options(netscope_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
     add_test(NAME netscope_tests COMMAND netscope_tests)
+
+    add_executable(netscope_event_id_tests
+        tests/test_event_id.cpp
+    )
+    target_compile_options(netscope_event_id_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+    add_test(NAME netscope_event_id_tests COMMAND netscope_event_id_tests)
 endif()
