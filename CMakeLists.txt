@@ -18,6 +18,7 @@ if(BUILD_TESTING)
     add_executable(netscope_tests
         tests/test_netstats.cpp
         src/netstats.cpp
+        src/tcp.cpp
     )
     target_compile_options(netscope_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
     add_test(NAME netscope_tests COMMAND netscope_tests)
