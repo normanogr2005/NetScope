@@ -16,4 +16,9 @@ struct TcpConnection {
 
 std::vector<TcpConnection> read_tcp_connections();
 
+std::vector<TcpConnection> read_tcp_connections(
+    const std::string& tcp_path,
+    const std::string& tcp6_path
+);
+
 } // namespace netscope
