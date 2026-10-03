@@ -25,10 +25,14 @@ NetScope is the second NORMANTOYS systems-security project, focused on the layer
 - Per-interface RX/TX bandwidth calculation
 - Continuous terminal refresh
 - TCP connection table
-- IPv4 TCP socket decoding
+- IPv4 and IPv6 TCP socket decoding
 - Linux-only `/proc` telemetry model
+- Security-Lab compatible NDJSON export
+- Collision-resistant per-process event IDs
+- Microsecond-resolution event timestamps
+- Strict CLI interval validation
 - No root requirement for the included telemetry
-- CMake build + CTest unit test
+- CMake build + CTest unit tests
 - GitHub Actions CI
 
 ## Requirements
@@ -64,6 +68,14 @@ Two-second sampling with TCP connections:
 ./build/netscope --interval 2 --connections
 ```
 
+Security-Lab NDJSON export:
+
+```bash
+./build/netscope --once --json --connections > events.ndjson
+```
+
+The `--json` mode emits one JSON object per line using the shared Security-Lab event contract.
+
 ## Example
 
 ```text
@@ -84,22 +96,13 @@ LOCAL                REMOTE               STATE
 192.168.1.20:42810   142.250.72.14:443    ESTABLISHED
 ```
 
-
-JSON output for Security-Lab:
-
-```bash
-./build/netscope --once --json --connections > events.ndjson
-```
-
-The `--json` mode emits one JSON object per line (NDJSON) using the shared Security-Lab event contract. Interface-rate events are emitted by default; add `--connections` to include TCP connection events.
-
 ## Testing
 
 ```bash
 ctest --test-dir build --output-on-failure
 ```
 
-The test suite validates `/proc/net/dev` parsing and byte-to-bit-rate calculations using a deterministic fixture.
+The suite covers `/proc/net/dev`, IPv4/IPv6 TCP parsing, event ID uniqueness, malformed TCP ports, and invalid CLI interval input.
 
 ## Architecture
 
@@ -109,7 +112,6 @@ See [`docs/architecture.md`](docs/architecture.md) for the data flow and samplin
 
 - [ ] Interface discovery metadata (MAC, MTU, state)
 - [ ] Top talkers by remote endpoint
-- [ ] JSON output for log pipelines
 - [ ] Threshold alerts for traffic spikes
 - [ ] UDP socket view
 - [ ] eBPF-backed telemetry mode
