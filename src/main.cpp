@@ -3,10 +3,12 @@
 
 #include <chrono>
 #include <cstdlib>
-#include <cstring>
+#include <ctime>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -16,6 +18,7 @@ namespace {
 struct Options {
     bool once{false};
     bool connections{false};
+    bool json{false};
     double interval{1.0};
 };
 
@@ -26,6 +29,7 @@ void print_help() {
         << "Usage: netscope [options]\n\n"
         << "  -1, --once             Print one snapshot and exit\n"
         << "  -c, --connections      Show TCP connections\n"
+        << "  -j, --json             Emit Security-Lab compatible NDJSON\n"
         << "  -i, --interval SEC     Sampling interval (default: 1.0)\n"
         << "  -h, --help             Show this help\n";
 }
@@ -37,6 +41,8 @@ bool parse_options(int argc, char** argv, Options& options) {
             options.once = true;
         } else if (arg == "-c" || arg == "--connections") {
             options.connections = true;
+        } else if (arg == "-j" || arg == "--json") {
+            options.json = true;
         } else if (arg == "-i" || arg == "--interval") {
             if (i + 1 >= argc) {
                 std::cerr << "--interval requires a value\n";
@@ -70,6 +76,61 @@ std::string human_rate(double bits_per_second) {
         return (std::to_string(bits_per_second / K).substr(0, 6) + " Kbps");
     }
     return (std::to_string(bits_per_second).substr(0, 6) + " bps");
+}
+
+std::string json_escape(const std::string& value) {
+    std::string out;
+    out.reserve(value.size() + 8);
+    for (const char ch : value) {
+        switch (ch) {
+        case '"': out += "\\\""; break;
+        case '\\': out += "\\\\"; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        default: out += ch; break;
+        }
+    }
+    return out;
+}
+
+std::string timestamp_now() {
+    const auto now = std::chrono::system_clock::now();
+    const std::time_t time = std::chrono::system_clock::to_time_t(now);
+    std::tm utc{};
+    gmtime_r(&time, &utc);
+    std::ostringstream out;
+    out << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
+    return out.str();
+}
+
+void print_json_rate(const netscope::RateStats& rate) {
+    std::cout << "{"
+              << "\"event_id\":\"netscope-rate-" << std::hash<std::string>{}(rate.name)
+              << "-" << std::time(nullptr) << "\","
+              << "\"timestamp\":\"" << timestamp_now() << "\","
+              << "\"source\":\"netscope\","
+              << "\"event_type\":\"network_interface_rate\","
+              << "\"severity\":\"info\","
+              << "\"message\":\"Interface traffic rate\","
+              << "\"metadata\":{\"interface\":\"" << json_escape(rate.name)
+              << "\",\"rx_bps\":" << rate.rx_bps
+              << ",\"tx_bps\":" << rate.tx_bps << "}}\n";
+}
+
+void print_json_connection(const netscope::TcpConnection& c) {
+    std::cout << "{"
+              << "\"event_id\":\"netscope-tcp-" << std::hash<std::string>{}(c.local_address + c.remote_address)
+              << "-" << c.local_port << "-" << c.remote_port << "-" << std::time(nullptr) << "\","
+              << "\"timestamp\":\"" << timestamp_now() << "\","
+              << "\"source\":\"netscope\","
+              << "\"event_type\":\"tcp_connection\","
+              << "\"severity\":\"info\","
+              << "\"source_ip\":\"" << json_escape(c.local_address) << "\","
+              << "\"destination_ip\":\"" << json_escape(c.remote_address) << "\","
+              << "\"source_port\":" << c.local_port << ","
+              << "\"destination_port\":" << c.remote_port << ","
+              << "\"metadata\":{\"state\":\"" << json_escape(c.state) << "\"}}\n";
 }
 
 void print_snapshot(const std::vector<netscope::RateStats>& rates) {
@@ -132,9 +193,21 @@ int main(int argc, char** argv) {
         const double elapsed = std::chrono::duration<double>(end - start).count();
         const auto rates = netscope::calculate_rates(previous, current, elapsed);
 
-        print_snapshot(rates);
-        if (options.connections) {
-            print_connections();
+        if (options.json) {
+            for (const auto& rate : rates) {
+                print_json_rate(rate);
+            }
+            if (options.connections) {
+                const auto connections = netscope::read_tcp_connections();
+                for (const auto& connection : connections) {
+                    print_json_connection(connection);
+                }
+            }
+        } else {
+            print_snapshot(rates);
+            if (options.connections) {
+                print_connections();
+            }
         }
 
         previous = current;
