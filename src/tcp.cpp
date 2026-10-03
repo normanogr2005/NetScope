@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 #include <array>
+#include <charconv>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -99,14 +100,18 @@ bool parse_endpoint(
     }
 
     unsigned int parsed_port{};
-    std::stringstream port_stream;
-    port_stream << std::hex << port_hex;
-    port_stream >> parsed_port;
+    const auto [end, error] = std::from_chars(
+        port_hex.data(),
+        port_hex.data() + port_hex.size(),
+        parsed_port,
+        16
+    );
 
     if (
-        port_stream.fail()
+        port_hex.empty()
+        || error != std::errc{}
+        || end != port_hex.data() + port_hex.size()
         || parsed_port > 65535U
-        || port_hex.empty()
     ) {
         return false;
     }
