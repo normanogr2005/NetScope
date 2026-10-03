@@ -84,6 +84,15 @@ LOCAL                REMOTE               STATE
 192.168.1.20:42810   142.250.72.14:443    ESTABLISHED
 ```
 
+
+JSON output for Security-Lab:
+
+```bash
+./build/netscope --once --json --connections > events.ndjson
+```
+
+The `--json` mode emits one JSON object per line (NDJSON) using the shared Security-Lab event contract. Interface-rate events are emitted by default; add `--connections` to include TCP connection events.
+
 ## Testing
 
 ```bash
