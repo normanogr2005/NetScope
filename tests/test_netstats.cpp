@@ -1,3 +1,7 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
 #include "../src/netstats.hpp"
 #include "../src/tcp.hpp"
 
