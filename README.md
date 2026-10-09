@@ -102,7 +102,7 @@ LOCAL                REMOTE               STATE
 ctest --test-dir build --output-on-failure
 ```
 
-The suite covers `/proc/net/dev`, IPv4/IPv6 TCP parsing, event ID uniqueness, malformed TCP ports, and invalid CLI interval input.
+The suite covers `/proc/net/dev` parsing, RX/TX rate calculations, invalid elapsed times, counter resets, IPv4/IPv6 TCP decoding, malformed TCP endpoints, event ID uniqueness, and invalid CLI interval input. Assertions remain enabled in Release builds so CI actually checks the expected results.
 
 ## Architecture
 
