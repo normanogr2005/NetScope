@@ -19,6 +19,8 @@ int main() {
         out << " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n";
         out << "  lo: 1000 10 0 0 0 0 0 0 2000 20 0 0 0 0 0 0\n";
         out << "eth0: 5000 50 0 0 0 0 0 0 7000 70 0 0 0 0 0 0\n";
+        out << "malformed: not enough fields\n";
+        out << "this line has no colon\n";
     }
 
     const auto first = netscope::read_interface_stats(path);
@@ -28,7 +30,10 @@ int main() {
     assert(first[1].tx_bytes == 7000);
     assert(netscope::read_interface_stats(path + ".missing").empty());
 
-    const auto second = std::vector<netscope::InterfaceStats>{{"eth0", 9000, 11000}};
+    const auto second = std::vector<netscope::InterfaceStats>{
+        {"eth0", 9000, 11000},
+        {"new0", 500, 700},
+    };
     const auto rates = netscope::calculate_rates(first, second, 2.0);
     assert(rates.size() == 1);
     assert(rates[0].name == "eth0");
@@ -53,6 +58,7 @@ int main() {
         out << "   1: 6401A8C0:0050 0100007F:0016 0A\n";
         out << "   2: 0100007F:0016X 0200007F:C350 01\n";
         out << "   3: 0100007F:GGGG 0200007F:C350 01\n";
+        out << "   4: 0100007G:0016 0200007F:C350 01\n";
     }
 
     {
