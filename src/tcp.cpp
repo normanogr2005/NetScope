@@ -4,7 +4,6 @@
 #include <array>
 #include <charconv>
 #include <fstream>
-#include <iomanip>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -18,11 +17,9 @@ std::string format_ipv4_hex(const std::string& value) {
     }
 
     std::uint32_t raw{};
-    std::stringstream parser;
-    parser << std::hex << value;
-    parser >> raw;
-
-    if (parser.fail()) {
+    const auto [end, error] = std::from_chars(
+        value.data(), value.data() + value.size(), raw, 16);
+    if (error != std::errc{} || end != value.data() + value.size()) {
         return "?";
     }
 
@@ -54,11 +51,13 @@ std::string format_ipv6_hex(const std::string& value) {
             const std::string hex_byte = value.substr(source, 2U);
 
             unsigned int parsed{};
-            std::stringstream parser;
-            parser << std::hex << hex_byte;
-            parser >> parsed;
-
-            if (parser.fail() || parsed > 255U) {
+            const auto [end, error] = std::from_chars(
+                hex_byte.data(), hex_byte.data() + hex_byte.size(), parsed, 16);
+            if (
+                error != std::errc{}
+                || end != hex_byte.data() + hex_byte.size()
+                || parsed > 255U
+            ) {
                 return "?";
             }
 
