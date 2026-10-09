@@ -37,4 +37,13 @@ if(BUILD_TESTING)
         netscope_rejects_invalid_interval
         PROPERTIES WILL_FAIL TRUE
     )
+
+    add_test(
+        NAME netscope_rejects_invalid_alert_threshold
+        COMMAND netscope --once --alert-mbps 0
+    )
+    set_tests_properties(
+        netscope_rejects_invalid_alert_threshold
+        PROPERTIES WILL_FAIL TRUE
+    )
 endif()
