@@ -117,7 +117,7 @@ The suite covers `/proc/net/dev` parsing, RX/TX rate calculations, invalid elaps
 
 ## Claude repository audit
 
-The repository includes [CLAUDE.md](CLAUDE.md) and a [security audit checklist](docs/security-audit-checklist.md). To run a full read-only Claude audit, add an `ANTHROPIC_API_KEY` repository Actions secret, then open **Actions → Claude Repository Audit → Run workflow**. The workflow has read-only repository permissions and is manually triggered to avoid unexpected API usage. Review the generated workflow summary; an AI audit is an additional review, not proof that the project is vulnerability-free.
+The repository includes [CLAUDE.md](CLAUDE.md), a [security audit checklist](docs/security-audit-checklist.md), and a manually triggered Claude workflow. Third-party Actions are pinned to immutable commit SHAs. To run a full read-only Claude audit, add an `ANTHROPIC_API_KEY` repository Actions secret, then open **Actions → Claude Repository Audit → Run workflow**. The workflow has read-only repository permissions and is manually triggered to avoid unexpected API usage. Review the generated workflow summary; an AI audit is an additional review, not proof that the project is vulnerability-free.
 
 ## Architecture
 
@@ -125,9 +125,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the data flow and samplin
 
 ## Roadmap
 
-- [ ] Interface discovery metadata (MAC, MTU, state)
-- [ ] Top talkers by remote endpoint
-- [ ] Threshold alerts for traffic spikes
+- [ ] Remote endpoint attribution (requires packet/eBPF-level telemetry; interface counters alone are insufficient)
 - [ ] UDP socket view
 - [ ] eBPF-backed telemetry mode
 
