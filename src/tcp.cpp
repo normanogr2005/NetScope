@@ -27,7 +27,10 @@ std::string format_ipv4_hex(const std::string& value) {
     }
 
     in_addr address{};
-    address.s_addr = htonl(raw);
+    // /proc/net/tcp stores the IPv4 value as a native-endian hex integer.
+    // Assigning it directly preserves the address bytes on both little- and
+    // big-endian Linux systems; htonl() would reverse them a second time.
+    address.s_addr = raw;
 
     char buffer[INET_ADDRSTRLEN]{};
     if (inet_ntop(AF_INET, &address, buffer, sizeof(buffer)) == nullptr) {
