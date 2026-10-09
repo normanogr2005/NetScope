@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cstdio>
 #include <fstream>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -47,6 +48,23 @@ int main() {
     assert(reset_rates.size() == 1);
     assert(reset_rates[0].rx_bps == 0.0);
     assert(reset_rates[0].tx_bps == 0.0);
+
+    const std::filesystem::path sysfs_root = "netscope_test_sysfs";
+    const auto interface_dir = sysfs_root / "eth-test";
+    std::filesystem::create_directories(interface_dir);
+    {
+        std::ofstream(interface_dir / "address") << "02:00:00:00:00:01\n";
+        std::ofstream(interface_dir / "mtu") << "1500\n";
+        std::ofstream(interface_dir / "operstate") << "up\n";
+    }
+    const auto metadata = netscope::read_interface_metadata("eth-test", sysfs_root.string());
+    assert(metadata.mac_address == "02:00:00:00:00:01");
+    assert(metadata.mtu == "1500");
+    assert(metadata.operstate == "up");
+    const auto missing_metadata = netscope::read_interface_metadata("missing0", sysfs_root.string());
+    assert(missing_metadata.mac_address == "unknown");
+    assert(netscope::read_interface_metadata("../etc", sysfs_root.string()).mtu == "unknown");
+    std::filesystem::remove_all(sysfs_root);
 
     const std::string tcp_path = "netscope_test_tcp.txt";
     const std::string tcp6_path = "netscope_test_tcp6.txt";
