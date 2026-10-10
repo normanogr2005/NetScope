@@ -5,8 +5,41 @@
 #include <sstream>
 #include <unordered_map>
 #include <cctype>
+#include <filesystem>
 
 namespace netscope {
+
+namespace {
+
+std::string read_sysfs_value(const std::filesystem::path& path) {
+    std::ifstream file(path);
+    std::string value;
+    if (file && std::getline(file, value) && !value.empty()) {
+        return value;
+    }
+    return "unknown";
+}
+
+bool safe_interface_name(const std::string& name) {
+    if (name.empty()) {
+        return false;
+    }
+    for (const unsigned char ch : name) {
+        if (
+            std::isalnum(ch) == 0
+            && ch != '_'
+            && ch != '-'
+            && ch != '.'
+            && ch != ':'
+        ) {
+            return false;
+        }
+    }
+    return name != "." && name != "..";
+}
+
+} // namespace
+
 
 std::vector<InterfaceStats> read_interface_stats(const std::string& path) {
     std::ifstream file(path);
@@ -91,6 +124,24 @@ std::vector<RateStats> calculate_rates(const std::vector<InterfaceStats>& previo
         return (a.rx_bps + a.tx_bps) > (b.rx_bps + b.tx_bps);
     });
     return result;
+}
+
+
+InterfaceMetadata read_interface_metadata(
+    const std::string& interface_name,
+    const std::string& sysfs_root
+) {
+    InterfaceMetadata metadata;
+    if (!safe_interface_name(interface_name)) {
+        return metadata;
+    }
+
+    const std::filesystem::path interface_path =
+        std::filesystem::path(sysfs_root) / interface_name;
+    metadata.mac_address = read_sysfs_value(interface_path / "address");
+    metadata.mtu = read_sysfs_value(interface_path / "mtu");
+    metadata.operstate = read_sysfs_value(interface_path / "operstate");
+    return metadata;
 }
 
 } // namespace netscope

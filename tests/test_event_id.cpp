@@ -1,3 +1,7 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
 #include "../src/event_id.hpp"
 
 #include <cassert>

@@ -1,4 +1,5 @@
 #include "event_id.hpp"
+#include "json_util.hpp"
 #include "netstats.hpp"
 #include "tcp.hpp"
 
@@ -9,6 +10,7 @@
 #include <ctime>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -21,6 +23,7 @@ struct Options {
     bool connections{false};
     bool json{false};
     double interval{1.0};
+    double alert_mbps{0.0};
 };
 
 void print_help() {
@@ -32,6 +35,7 @@ void print_help() {
         << "  -c, --connections      Show TCP connections\n"
         << "  -j, --json             Emit Security-Lab compatible NDJSON\n"
         << "  -i, --interval SEC     Sampling interval (default: 1.0)\n"
+        << "      --alert-mbps N     Warn when RX or TX reaches N Mbps\n"
         << "  -h, --help             Show this help\n";
 }
 
@@ -75,6 +79,21 @@ bool parse_options(int argc, char** argv, Options& options) {
                 std::cerr << "interval must be a finite number > 0\n";
                 return false;
             }
+        } else if (arg == "--alert-mbps") {
+            if (i + 1 >= argc) {
+                std::cerr << "--alert-mbps requires a value\n";
+                return false;
+            }
+
+            const std::string value = argv[++i];
+            if (
+                !parse_interval(value, options.alert_mbps)
+                || options.alert_mbps >
+                    std::numeric_limits<double>::max() / 1000000.0
+            ) {
+                std::cerr << "alert threshold must be finite, > 0, and representable in bps\n";
+                return false;
+            }
         } else if (arg == "-h" || arg == "--help") {
             print_help();
             std::exit(0);
@@ -86,34 +105,23 @@ bool parse_options(int argc, char** argv, Options& options) {
     return true;
 }
 
+// Formats rates with stable precision without truncating significant digits.
 std::string human_rate(double bits_per_second) {
     constexpr double K = 1000.0;
-    if (bits_per_second >= K * K * K) {
-        return (std::to_string(bits_per_second / (K * K * K)).substr(0, 6) + " Gbps");
-    }
-    if (bits_per_second >= K * K) {
-        return (std::to_string(bits_per_second / (K * K)).substr(0, 6) + " Mbps");
-    }
-    if (bits_per_second >= K) {
-        return (std::to_string(bits_per_second / K).substr(0, 6) + " Kbps");
-    }
-    return (std::to_string(bits_per_second).substr(0, 6) + " bps");
-}
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(2);
 
-std::string json_escape(const std::string& value) {
-    std::string out;
-    out.reserve(value.size() + 8);
-    for (const char ch : value) {
-        switch (ch) {
-        case '"': out += "\\\""; break;
-        case '\\': out += "\\\\"; break;
-        case '\n': out += "\\n"; break;
-        case '\r': out += "\\r"; break;
-        case '\t': out += "\\t"; break;
-        default: out += ch; break;
-        }
+    if (bits_per_second >= K * K * K) {
+        out << (bits_per_second / (K * K * K)) << " Gbps";
+    } else if (bits_per_second >= K * K) {
+        out << (bits_per_second / (K * K)) << " Mbps";
+    } else if (bits_per_second >= K) {
+        out << (bits_per_second / K) << " Kbps";
+    } else {
+        out << bits_per_second << " bps";
     }
-    return out;
+
+    return out.str();
 }
 
 std::string timestamp_now() {
@@ -137,17 +145,24 @@ std::string timestamp_now() {
     return out.str();
 }
 
-void print_json_rate(const netscope::RateStats& rate) {
+void print_json_rate(const netscope::RateStats& rate, double alert_mbps) {
+    const auto metadata = netscope::read_interface_metadata(rate.name);
+    const bool alert = alert_mbps > 0.0
+        && (rate.rx_bps >= alert_mbps * 1000000.0
+            || rate.tx_bps >= alert_mbps * 1000000.0);
     std::cout << "{"
               << "\"event_id\":\"" << netscope::make_event_id("rate") << "\","
               << "\"timestamp\":\"" << timestamp_now() << "\","
               << "\"source\":\"netscope\","
               << "\"event_type\":\"network_interface_rate\","
-              << "\"severity\":\"info\","
-              << "\"message\":\"Interface traffic rate\","
-              << "\"metadata\":{\"interface\":\"" << json_escape(rate.name)
+              << "\"severity\":\"" << (alert ? "warning" : "info") << "\","
+              << "\"message\":\"" << (alert ? "Interface traffic threshold exceeded" : "Interface traffic rate") << "\","
+              << "\"metadata\":{\"interface\":\"" << netscope::json_escape(rate.name)
               << "\",\"rx_bps\":" << rate.rx_bps
-              << ",\"tx_bps\":" << rate.tx_bps << "}}\n";
+              << ",\"tx_bps\":" << rate.tx_bps
+              << ",\"mac_address\":\"" << netscope::json_escape(metadata.mac_address)
+              << "\",\"mtu\":\"" << netscope::json_escape(metadata.mtu)
+              << "\",\"operstate\":\"" << netscope::json_escape(metadata.operstate) << "\"}}\n";
 }
 
 void print_json_connection(const netscope::TcpConnection& c) {
@@ -157,11 +172,11 @@ void print_json_connection(const netscope::TcpConnection& c) {
               << "\"source\":\"netscope\","
               << "\"event_type\":\"tcp_connection\","
               << "\"severity\":\"info\","
-              << "\"source_ip\":\"" << json_escape(c.local_address) << "\","
-              << "\"destination_ip\":\"" << json_escape(c.remote_address) << "\","
+              << "\"source_ip\":\"" << netscope::json_escape(c.local_address) << "\","
+              << "\"destination_ip\":\"" << netscope::json_escape(c.remote_address) << "\","
               << "\"source_port\":" << c.local_port << ","
               << "\"destination_port\":" << c.remote_port << ","
-              << "\"metadata\":{\"state\":\"" << json_escape(c.state) << "\"}}\n";
+              << "\"metadata\":{\"state\":\"" << netscope::json_escape(c.state) << "\"}}\n";
 }
 
 void print_snapshot(const std::vector<netscope::RateStats>& rates) {
@@ -172,16 +187,21 @@ void print_snapshot(const std::vector<netscope::RateStats>& rates) {
     std::cout << "└──────────────────────────────────────────────────────────────┘\n\n";
     std::cout << std::left << std::setw(14) << "INTERFACE"
               << std::right << std::setw(16) << "RX"
-              << std::setw(16) << "TX" << "\n";
-    std::cout << std::string(48, '-') << "\n";
+              << std::setw(16) << "TX" << "  "
+              << std::left << std::setw(8) << "STATE" << "  MAC / MTU" << "\n";
+    std::cout << std::string(90, '-') << "\n";
     if (rates.empty()) {
         std::cout << "No interface samples available.\n";
         return;
     }
     for (const auto& rate : rates) {
+        const auto metadata = netscope::read_interface_metadata(rate.name);
         std::cout << std::left << std::setw(14) << rate.name
                   << std::right << std::setw(16) << human_rate(rate.rx_bps)
-                  << std::setw(16) << human_rate(rate.tx_bps) << "\n";
+                  << std::setw(16) << human_rate(rate.tx_bps)
+                  << "  " << std::left << std::setw(8) << metadata.operstate
+                  << "  " << metadata.mac_address
+                  << "  MTU " << metadata.mtu << "\n";
     }
 }
 
@@ -226,7 +246,7 @@ int main(int argc, char** argv) {
 
         if (options.json) {
             for (const auto& rate : rates) {
-                print_json_rate(rate);
+                print_json_rate(rate, options.alert_mbps);
             }
             if (options.connections) {
                 const auto connections = netscope::read_tcp_connections();
@@ -236,6 +256,17 @@ int main(int argc, char** argv) {
             }
         } else {
             print_snapshot(rates);
+            if (options.alert_mbps > 0.0) {
+                const double threshold_bps = options.alert_mbps * 1000000.0;
+                for (const auto& rate : rates) {
+                    if (rate.rx_bps >= threshold_bps || rate.tx_bps >= threshold_bps) {
+                        std::cerr << "WARNING: " << rate.name
+                                  << " exceeded " << options.alert_mbps
+                                  << " Mbps (RX " << human_rate(rate.rx_bps)
+                                  << ", TX " << human_rate(rate.tx_bps) << ")\n";
+                    }
+                }
+            }
             if (options.connections) {
                 print_connections();
             }

@@ -23,6 +23,8 @@ NetScope is the second NORMANTOYS systems-security project, focused on the layer
 ## Features
 
 - Per-interface RX/TX bandwidth calculation
+- Interface MAC address, MTU, and operational-state metadata from sysfs
+- Configurable RX/TX traffic threshold warnings
 - Continuous terminal refresh
 - TCP connection table
 - IPv4 and IPv6 TCP socket decoding
@@ -68,6 +70,15 @@ Two-second sampling with TCP connections:
 ./build/netscope --interval 2 --connections
 ```
 
+Warn when either RX or TX reaches 100 Mbps:
+
+```bash
+./build/netscope --interval 1 --alert-mbps 100
+```
+
+The threshold is optional. Without `--alert-mbps`, threshold warnings are disabled.
+In NDJSON mode, events above the configured threshold are emitted with `severity: "warning"`.
+
 Security-Lab NDJSON export:
 
 ```bash
@@ -102,7 +113,11 @@ LOCAL                REMOTE               STATE
 ctest --test-dir build --output-on-failure
 ```
 
-The suite covers `/proc/net/dev`, IPv4/IPv6 TCP parsing, event ID uniqueness, malformed TCP ports, and invalid CLI interval input.
+The suite covers `/proc/net/dev` parsing, RX/TX rate calculations, invalid elapsed times, counter resets, sysfs interface metadata, IPv4/IPv6 TCP decoding, malformed TCP endpoints, event ID uniqueness, and invalid CLI input. Assertions remain enabled in Release builds so CI checks expected results. CI also runs AddressSanitizer and UndefinedBehaviorSanitizer.
+
+## Claude repository audit
+
+The repository includes [CLAUDE.md](CLAUDE.md), a [security audit checklist](docs/security-audit-checklist.md), and a manually triggered Claude workflow. Third-party Actions are pinned to immutable commit SHAs. To run a full read-only Claude audit, add an `ANTHROPIC_API_KEY` repository Actions secret, then open **Actions → Claude Repository Audit → Run workflow**. The workflow has read-only repository permissions and is manually triggered to avoid unexpected API usage. Review the generated workflow summary; an AI audit is an additional review, not proof that the project is vulnerability-free.
 
 ## Architecture
 
@@ -110,9 +125,7 @@ See [`docs/architecture.md`](docs/architecture.md) for the data flow and samplin
 
 ## Roadmap
 
-- [ ] Interface discovery metadata (MAC, MTU, state)
-- [ ] Top talkers by remote endpoint
-- [ ] Threshold alerts for traffic spikes
+- [ ] Remote endpoint attribution (requires packet/eBPF-level telemetry; interface counters alone are insufficient)
 - [ ] UDP socket view
 - [ ] eBPF-backed telemetry mode
 

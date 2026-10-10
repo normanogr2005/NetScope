@@ -4,7 +4,6 @@
 #include <array>
 #include <charconv>
 #include <fstream>
-#include <iomanip>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -18,16 +17,17 @@ std::string format_ipv4_hex(const std::string& value) {
     }
 
     std::uint32_t raw{};
-    std::stringstream parser;
-    parser << std::hex << value;
-    parser >> raw;
-
-    if (parser.fail()) {
+    const auto [end, error] = std::from_chars(
+        value.data(), value.data() + value.size(), raw, 16);
+    if (error != std::errc{} || end != value.data() + value.size()) {
         return "?";
     }
 
     in_addr address{};
-    address.s_addr = htonl(raw);
+    // /proc/net/tcp stores the IPv4 value as a native-endian hex integer.
+    // Assigning it directly preserves the address bytes on both little- and
+    // big-endian Linux systems; htonl() would reverse them a second time.
+    address.s_addr = raw;
 
     char buffer[INET_ADDRSTRLEN]{};
     if (inet_ntop(AF_INET, &address, buffer, sizeof(buffer)) == nullptr) {
@@ -47,15 +47,26 @@ std::string format_ipv6_hex(const std::string& value) {
     // /proc/net/tcp6 stores each 32-bit word in host byte order.
     for (std::size_t word = 0; word < 4U; ++word) {
         for (std::size_t byte = 0; byte < 4U; ++byte) {
+            // procfs prints each 32-bit IPv6 word as a native-endian integer.
+            // Its textual byte order therefore needs reversing only on
+            // little-endian hosts.
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
             const std::size_t source = word * 8U + (3U - byte) * 2U;
+#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+            const std::size_t source = word * 8U + byte * 2U;
+#else
+#error "NetScope requires a compiler that exposes host byte order"
+#endif
             const std::string hex_byte = value.substr(source, 2U);
 
             unsigned int parsed{};
-            std::stringstream parser;
-            parser << std::hex << hex_byte;
-            parser >> parsed;
-
-            if (parser.fail() || parsed > 255U) {
+            const auto [end, error] = std::from_chars(
+                hex_byte.data(), hex_byte.data() + hex_byte.size(), parsed, 16);
+            if (
+                error != std::errc{}
+                || end != hex_byte.data() + hex_byte.size()
+                || parsed > 255U
+            ) {
                 return "?";
             }
 

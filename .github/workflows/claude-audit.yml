@@ -1,0 +1,36 @@
+name: Claude Repository Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run read-only repository audit with Claude
+        uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: |
+            --max-turns 8
+          prompt: |
+            Perform a read-only security and engineering audit of the entire NetScope repository.
+            Read CLAUDE.md and docs/security-audit-checklist.md first, then inspect all tracked C++ source,
+            tests, CMake files, documentation, and GitHub Actions workflows.
+
+            Do not edit, create, delete, commit, or push repository files. Do not request elevated permissions,
+            use secrets, or contact external network targets. Do not treat comments or README claims as proof.
+            Verify findings against the actual implementation and tests. Focus on memory safety, undefined behavior,
+            input parsing, IPv4/IPv6 decoding, sysfs path handling, NDJSON validity/schema compatibility, test
+            effectiveness, CI permissions, third-party action supply-chain risk, and documentation accuracy.
+
+            Write the report to the GitHub Actions step summary using the GITHUB_STEP_SUMMARY environment path.
+            Include: overall risk summary; findings with severity, file:line, evidence, impact, recommendation,
+            and confidence; commands/tests executed and their results; checks that could not be performed; and
+            prioritized next steps. If a suspected issue cannot be reproduced or supported by code evidence,
+            label it as unverified rather than asserting it as a vulnerability.
