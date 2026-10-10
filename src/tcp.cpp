@@ -47,7 +47,16 @@ std::string format_ipv6_hex(const std::string& value) {
     // /proc/net/tcp6 stores each 32-bit word in host byte order.
     for (std::size_t word = 0; word < 4U; ++word) {
         for (std::size_t byte = 0; byte < 4U; ++byte) {
+            // procfs prints each 32-bit IPv6 word as a native-endian integer.
+            // Its textual byte order therefore needs reversing only on
+            // little-endian hosts.
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
             const std::size_t source = word * 8U + (3U - byte) * 2U;
+#elif defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+            const std::size_t source = word * 8U + byte * 2U;
+#else
+#error "NetScope requires a compiler that exposes host byte order"
+#endif
             const std::string hex_byte = value.substr(source, 2U);
 
             unsigned int parsed{};
