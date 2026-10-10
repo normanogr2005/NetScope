@@ -1,4 +1,5 @@
 #include "event_id.hpp"
+#include "json_util.hpp"
 #include "netstats.hpp"
 #include "tcp.hpp"
 
@@ -99,34 +100,23 @@ bool parse_options(int argc, char** argv, Options& options) {
     return true;
 }
 
+// Formats rates with stable precision without truncating significant digits.
 std::string human_rate(double bits_per_second) {
     constexpr double K = 1000.0;
-    if (bits_per_second >= K * K * K) {
-        return (std::to_string(bits_per_second / (K * K * K)).substr(0, 6) + " Gbps");
-    }
-    if (bits_per_second >= K * K) {
-        return (std::to_string(bits_per_second / (K * K)).substr(0, 6) + " Mbps");
-    }
-    if (bits_per_second >= K) {
-        return (std::to_string(bits_per_second / K).substr(0, 6) + " Kbps");
-    }
-    return (std::to_string(bits_per_second).substr(0, 6) + " bps");
-}
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(2);
 
-std::string json_escape(const std::string& value) {
-    std::string out;
-    out.reserve(value.size() + 8);
-    for (const char ch : value) {
-        switch (ch) {
-        case '"': out += "\\\""; break;
-        case '\\': out += "\\\\"; break;
-        case '\n': out += "\\n"; break;
-        case '\r': out += "\\r"; break;
-        case '\t': out += "\\t"; break;
-        default: out += ch; break;
-        }
+    if (bits_per_second >= K * K * K) {
+        out << (bits_per_second / (K * K * K)) << " Gbps";
+    } else if (bits_per_second >= K * K) {
+        out << (bits_per_second / (K * K)) << " Mbps";
+    } else if (bits_per_second >= K) {
+        out << (bits_per_second / K) << " Kbps";
+    } else {
+        out << bits_per_second << " bps";
     }
-    return out;
+
+    return out.str();
 }
 
 std::string timestamp_now() {
