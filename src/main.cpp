@@ -152,12 +152,12 @@ void print_json_rate(const netscope::RateStats& rate, double alert_mbps) {
               << "\"event_type\":\"network_interface_rate\","
               << "\"severity\":\"" << (alert ? "warning" : "info") << "\","
               << "\"message\":\"" << (alert ? "Interface traffic threshold exceeded" : "Interface traffic rate") << "\","
-              << "\"metadata\":{\"interface\":\"" << json_escape(rate.name)
+              << "\"metadata\":{\"interface\":\"" << netscope::json_escape(rate.name)
               << "\",\"rx_bps\":" << rate.rx_bps
               << ",\"tx_bps\":" << rate.tx_bps
-              << ",\"mac_address\":\"" << json_escape(metadata.mac_address)
-              << "\",\"mtu\":\"" << json_escape(metadata.mtu)
-              << "\",\"operstate\":\"" << json_escape(metadata.operstate) << "\"}}\n";
+              << ",\"mac_address\":\"" << netscope::json_escape(metadata.mac_address)
+              << "\",\"mtu\":\"" << netscope::json_escape(metadata.mtu)
+              << "\",\"operstate\":\"" << netscope::json_escape(metadata.operstate) << "\"}}\n";
 }
 
 void print_json_connection(const netscope::TcpConnection& c) {
@@ -167,11 +167,11 @@ void print_json_connection(const netscope::TcpConnection& c) {
               << "\"source\":\"netscope\","
               << "\"event_type\":\"tcp_connection\","
               << "\"severity\":\"info\","
-              << "\"source_ip\":\"" << json_escape(c.local_address) << "\","
-              << "\"destination_ip\":\"" << json_escape(c.remote_address) << "\","
+              << "\"source_ip\":\"" << netscope::json_escape(c.local_address) << "\","
+              << "\"destination_ip\":\"" << netscope::json_escape(c.remote_address) << "\","
               << "\"source_port\":" << c.local_port << ","
               << "\"destination_port\":" << c.remote_port << ","
-              << "\"metadata\":{\"state\":\"" << json_escape(c.state) << "\"}}\n";
+              << "\"metadata\":{\"state\":\"" << netscope::json_escape(c.state) << "\"}}\n";
 }
 
 void print_snapshot(const std::vector<netscope::RateStats>& rates) {
