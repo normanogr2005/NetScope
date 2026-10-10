@@ -10,6 +10,7 @@
 #include <ctime>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -85,8 +86,12 @@ bool parse_options(int argc, char** argv, Options& options) {
             }
 
             const std::string value = argv[++i];
-            if (!parse_interval(value, options.alert_mbps)) {
-                std::cerr << "alert threshold must be a finite number > 0\n";
+            if (
+                !parse_interval(value, options.alert_mbps)
+                || options.alert_mbps >
+                    std::numeric_limits<double>::max() / 1000000.0
+            ) {
+                std::cerr << "alert threshold must be finite, > 0, and representable in bps\n";
                 return false;
             }
         } else if (arg == "-h" || arg == "--help") {
