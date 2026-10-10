@@ -29,6 +29,12 @@ if(BUILD_TESTING)
     target_compile_options(netscope_event_id_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
     add_test(NAME netscope_event_id_tests COMMAND netscope_event_id_tests)
 
+    add_executable(netscope_json_util_tests
+        tests/test_json_util.cpp
+    )
+    target_compile_options(netscope_json_util_tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+    add_test(NAME netscope_json_util_tests COMMAND netscope_json_util_tests)
+
     add_test(
         NAME netscope_rejects_invalid_interval
         COMMAND netscope --once --interval 1abc
